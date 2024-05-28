@@ -1,0 +1,13 @@
+What's next?:
+Find out if there's a way to not write out that cumbersome Opcodes::...
+Implement all of the binary operations
+Implement the memory accesses in the way the original computer did it (or just something easier you're the boss)
+Move all of the code to a lib.rs and main.rs, maybe more modules
+Debugging information about the computer
+Configure my neovim for rust because this is so annoying
+Optimize/refactor code after all of this
+Create tests for opcodes and errors and whatnot
+Make the C compiler and see if it works
+
+Done:
+Computer object with working opcodes

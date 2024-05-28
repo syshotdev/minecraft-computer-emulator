@@ -6,6 +6,7 @@ pkgs.mkShellNoCC {
   packages = with pkgs; [
     cargo
     rustc
+    gcc
   ];
 }
 

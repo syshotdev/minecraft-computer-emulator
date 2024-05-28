@@ -75,16 +75,19 @@ impl Computer {
             function_stack_pointer: 0,
         }
     }
-    fn execute_opcode(&mut self, opcode: Opcodes, args: [u16; 3]) {
+    fn execute_opcode(&mut self, opcode: Opcodes, args: [u16; 3]) -> Result<(), String> {
+        use Opcodes::*;
         match opcode {
-            Opcodes::NOP => return,
+            Opcodes::NOP => break,
             Opcodes::ADD => self.logic_operation(args, |a, b| a + b),
             Opcodes::SUB => self.logic_operation(args, |a, b| a - b),
             Opcodes::MULT => self.logic_operation(args, |a, b| a * b),
             Opcodes::DIV => self.logic_operation(args, |a, b| a / b),
             Opcodes::MOD => self.logic_operation(args, |a, b| a % b),
-            _ => todo!(),
+            // None of these matched? Well error.
+            _ => return Err(format!("I didn't implement the opcode {:#X}", opcode)),
         }
+        Ok(())
     }
     // Logic operations like add, sub and whatever that use two 16 bit registers and output one 16
     // bit register. Multiply and divide should give 32 bit, but I don't care so whatever
