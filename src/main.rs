@@ -52,7 +52,7 @@ enum Opcodes {
     JMPZ, // JuMP if Zero
 
     // Debug
-    DEBUG, // First operand pointer to memory, second length, interpreted as chars and printed
+    PRINT, // First operand pointer to memory, second length, interpreted as chars and printed
 
     // Halt!
     HALT,
@@ -108,7 +108,7 @@ impl Computer {
             SHIFTL => self.math_operation(args, |a, b| a << b),
             SHIFTR => self.math_operation(args, |a, b| a >> b),
 
-            NOT => self.unary_operation(args, |a| !a), // I hate how this uses another function 
+            NOT => self.unary_operation(args, |a| !a), 
 
             LOAD => self.registers[args[1] as usize] = args[0], // Load args[0] into register args[1]
 
@@ -118,7 +118,7 @@ impl Computer {
             RCOPY => self.registers[args[1] as usize] = self.ram[args[0] as usize],
             ICOPY => self.registers[args[1] as usize] = self.rom[args[0] as usize],
 
-            DUBUG => {
+            PRINT => {
                 let address: usize = args[0] as usize;
                 let length: usize = args[1] as usize;
                 let u16s_to_convert = &self.ram[address..address+length];
@@ -129,7 +129,7 @@ impl Computer {
                     .map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER))
                     .collect();
 
-                println!(string)
+                println!("{}", string);
             },
 
             JMP => self.program_counter = args[0],
@@ -179,10 +179,16 @@ impl Computer {
 fn main() {
     let mut computer = Computer::new();
 
+    computer.ram[0..16].copy_from_slice(&[72; 16]); // Ascii for H
+
     computer.registers[0] = 10;
     computer.registers[1] = 20;
 
     match computer.execute_opcode(Opcodes::ADD, [0, 1, 2]) {
+        Ok(()) => (),
+        Err(e) => panic!("Error: {}", e),
+    }
+    match computer.execute_opcode(Opcodes::PRINT, [0, 16, 0]) {
         Ok(()) => (),
         Err(e) => panic!("Error: {}", e),
     }
