@@ -4,17 +4,12 @@
 // Maybe ram size and whatever will be defined in there? I'd rather just set those in code so nah.
 
 use std::fs::{self, OpenOptions};
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{Read, BufRead, BufReader, Write};
 use std::path::Path;
-
-#[derive(Debug)]
-struct OpcodeEntry {
-    opcode: String,
-    number: u32,
-}
+use crate::types::OpcodeEntry;
 
 // Expects an opcode and value, (ADD 37)
-fn parse_machine_file(file_path: &str) -> Vec<OpcodeEntry> {
+pub fn parse_machine_file(file_path: &str) -> Vec<OpcodeEntry> {
     let path = Path::new(file_path);
 
     // Ensure the file ends with a newline
@@ -43,7 +38,8 @@ fn parse_machine_file(file_path: &str) -> Vec<OpcodeEntry> {
                     panic!("Parsing error: '{}' is not a valid number", parts[1])
                 });
 
-                entries.push(OpcodeEntry { opcode, number });
+                // try_into tries to coerce number into right type, OR ELSE PANIC!
+                entries.push(OpcodeEntry { opcode, number: number.try_into().unwrap() });
             }
             Err(err) => panic!("Error reading line: {}", err),
         }

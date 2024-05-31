@@ -6,6 +6,8 @@
 // add rest of commands because I think I'm missing ram ones, and some are not well documented
 // I'm doing source -> destination rather than what CPUS actually do, which is dest <- source
 
+use crate::opcodes::{Opcodes, OpcodeDictionary}; // Dictionary for enums to ints
+use crate::types::OpcodeEntry;
 
 // Struct telling the compiler how much to allocate for memory
 pub struct ComputerConfig {
@@ -31,7 +33,6 @@ impl Default for ComputerConfig {
     }
 }
 
-#[derive(Debug)]
 pub struct Computer {
     // We're using vectors for arrays because easier to set up (boohoo 10% performance loss)
     rom: Vec<u16>, 
@@ -46,17 +47,20 @@ pub struct Computer {
 
     alu_zero_flag: bool,
     jmped: bool,
+
+    // Dictionary for mapping enums to ints and vice versa
+    opcode_dict: OpcodeDictionary,
 }
 
 impl Computer {
     // New computer based on config
-    fn new(config: ComputerConfig) -> Self {
+    pub fn new(config: ComputerConfig, opcode_entries: Vec<OpcodeEntry>) -> Self {
         Self {
-            rom: vec![0, config.rom],
-            ram: vec![0, config.ram],
-            registers: vec![0, config.registers],
-            data_stack: vec![0, config.data_stack],
-            function_stack: vec![0, config.function_stack],
+            rom: vec![0, config.rom.try_into().unwrap()],
+            ram: vec![0, config.ram.try_into().unwrap()],
+            registers: vec![0, config.registers.try_into().unwrap()],
+            data_stack: vec![0, config.data_stack.try_into().unwrap()],
+            function_stack: vec![0, config.function_stack.try_into().unwrap()],
 
             program_counter: 0,
             data_stack_pointer: 0,
@@ -64,24 +68,28 @@ impl Computer {
 
             alu_zero_flag: false,
             jmped: false,
+
+            // Others
+            opcode_dict: OpcodeDictionary::new(opcode_entries),
         }
     }
 
     // Simulates one clock cycle for the computer
-    fn clock() -> {
+    // NOT IMPLEMENTED YET
+    /*fn clock(&self) {
         const bytes_for_instruction = 4;
 
         // Fetch instruction from rom and execute it.
-        self.execute_opcode(rom[program_counter], rom[program_counter+1..program_counter+3]);
+        self.execute_opcode(self.rom[self.program_counter], self.rom[self.program_counter+1..self.program_counter+3]);
 
         // If we jump and then add to program_counter, bad things happen.
-        if !jmped {
-            program_counter += bytes_for_instruction; 
+        if !self.jmped {
+            self.program_counter += bytes_for_instruction; 
         }
-    }
+    }*/
 
     // Takes an opcode and args and executes it like the CPU would
-    fn execute_opcode(&mut self, opcode: Opcodes, args: [u16; 3]) -> Result<(), String> {
+    pub fn execute_opcode(&mut self, opcode: Opcodes, args: [u16; 3]) -> Result<(), String> {
         use Opcodes::*; // Include the opcodes so we don't do Opcodes:: all the time
         match opcode {
             NOP => (),

@@ -4,14 +4,13 @@
 
 mod computer;
 mod parser;
+mod opcodes;
+mod types;
 
 use computer::{Computer, ComputerConfig};
 use parser::parse_machine_file;
 
 fn main() {
-    let file_path = "machine.txt"; // A file for operations and 
-    let entries = parse_machine_file(file_path);
-
     // Define the configuration for computer (We're basically adding overrides to default)
     let config = ComputerConfig {
         registers: 32,
@@ -20,8 +19,9 @@ fn main() {
         ..Default::default() 
     };
 
-    let mut computer = Computer::new(config);
+    let file_path = "machine.txt";
+    let opcode_entries = parse_machine_file(file_path);
 
-    println!("Registers: {:?}", &computer.registers);
+    let mut computer = Computer::new(config, opcode_entries);
 }
 
