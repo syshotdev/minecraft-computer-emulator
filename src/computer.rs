@@ -12,6 +12,7 @@ use crate::types::OpcodeEntry;
 // Struct telling the compiler how much to allocate for memory
 pub struct ComputerConfig {
     // Sizes for components
+    pub irom: usize, // I Rom = instruction rom
     pub rom: usize,
     pub ram: usize,
     pub registers: usize,
@@ -24,6 +25,7 @@ const K: usize = 1024;
 impl Default for ComputerConfig {
     fn default() -> Self {
         Self {
+            irom: 8 * K,
             rom: 32 * K,
             ram: 8 * K,
             registers: 8,
@@ -35,7 +37,8 @@ impl Default for ComputerConfig {
 
 pub struct Computer {
     // We're using vectors for arrays because easier to set up (boohoo 10% performance loss)
-    rom: Vec<u16>, 
+    pub irom: Vec<u16>, // I Rom = instruction rom
+    pub rom: Vec<u16>, 
     ram: Vec<u16>,
     registers: Vec<u16>, // For IRIS it was like 30 ish
     data_stack: Vec<u16>,
@@ -49,18 +52,22 @@ pub struct Computer {
     jmped: bool,
 
     // Dictionary for mapping enums to ints and vice versa
-    opcode_dict: OpcodeDictionary,
+    opcode_converter: OpcodeDictionary,
 }
 
 impl Computer {
     // New computer based on config
-    pub fn new(config: ComputerConfig, opcode_entries: Vec<OpcodeEntry>) -> Self {
-        Self {
-            rom: vec![0, config.rom.try_into().unwrap()],
-            ram: vec![0, config.ram.try_into().unwrap()],
-            registers: vec![0, config.registers.try_into().unwrap()],
-            data_stack: vec![0, config.data_stack.try_into().unwrap()],
-            function_stack: vec![0, config.function_stack.try_into().unwrap()],
+    pub fn build(config: ComputerConfig, opcode_entries: &Vec<OpcodeEntry>) -> Result<Self, String> {
+        // ? = convenient way to unwrap and propagate error to main function
+        let opcode_converter = OpcodeDictionary::build(&opcode_entries)?;
+
+        Ok(Self {
+            irom: vec![0; config.irom.try_into().unwrap()],
+            rom: vec![0; config.rom.try_into().unwrap()],
+            ram: vec![0; config.ram.try_into().unwrap()],
+            registers: vec![0; config.registers.try_into().unwrap()],
+            data_stack: vec![0; config.data_stack.try_into().unwrap()],
+            function_stack: vec![0; config.function_stack.try_into().unwrap()],
 
             program_counter: 0,
             data_stack_pointer: 0,
@@ -70,33 +77,49 @@ impl Computer {
             jmped: false,
 
             // Others
-            opcode_dict: OpcodeDictionary::new(opcode_entries),
-        }
+            opcode_converter: opcode_converter,
+        })
     }
 
     // Simulates one clock cycle for the computer
     // NOT IMPLEMENTED YET
-    /*fn clock(&self) {
-        const bytes_for_instruction = 4;
+    pub fn clock(&mut self) -> Result<(), String> {
+        let address: usize = self.program_counter as usize;
+        //println!("Address: {}", address);
 
-        // Fetch instruction from rom and execute it.
-        self.execute_opcode(self.rom[self.program_counter], self.rom[self.program_counter+1..self.program_counter+3]);
+        // Get opcode from instruction rom
+        let opcode: Opcodes = self.opcode_converter.int_to_opcode(self.irom[address].into())?;
+
+        // Since all args are 3 long, we have to go in steps of 3.
+        let args: [u16; 3] = [
+            self.rom[address * 3],
+            self.rom[address * 3 + 1],
+            self.rom[address * 3 + 2],
+        ];
+
+
+        // execute_opcode returns result which we format and propagate back to whoever was calling
+        self.execute_opcode(opcode, args).map_err(|e| format!("Error while ticking clock: {e}"))?;
 
         // If we jump and then add to program_counter, bad things happen.
         if !self.jmped {
-            self.program_counter += bytes_for_instruction; 
-        }
-    }*/
+            self.program_counter += 1;
+        };
+        self.jmped = false;
+
+        Ok(())
+    }
 
     // Takes an opcode and args and executes it like the CPU would
     pub fn execute_opcode(&mut self, opcode: Opcodes, args: [u16; 3]) -> Result<(), String> {
         use Opcodes::*; // Include the opcodes so we don't do Opcodes:: all the time
+        //println!("Current opcode being run: {}", opcode.to_string());
         match opcode {
             NOP => (),
-            ADD => self.math_operation(args, |a, b| a + b),
-            SUB => self.math_operation(args, |a, b| a - b),
-            MULT => self.math_operation(args, |a, b| a * b),
-            DIV => self.math_operation(args, |a, b| a / b),
+            ADD => self.math_operation(args, |a, b| a.wrapping_add(b)),
+            SUB => self.math_operation(args, |a, b| a.wrapping_sub(b)),
+            MULT => self.math_operation(args, |a, b|a.wrapping_mul(b)),
+            DIV => self.math_operation(args, |a, b| a.wrapping_div(b)),
             MOD => self.math_operation(args, |a, b| a % b),
 
             OR => self.math_operation(args, |a, b| a | b),
@@ -164,10 +187,13 @@ impl Computer {
         F: Fn(u16, u16) -> u16,
     {
         // Register1 always, Register2 IF provided. If only register1, it's unary operation.
+        // By the way these are values from the registers, not the register number itself
         let register1 = self.registers[src1 as usize];
         let register2 = src2.map_or(0, |r| self.registers[r as usize]);
 
-        let result = operation(register1, register2);
+        // We wrapping add because it turns numbers into their wrapped versions,
+        // to allow for overflow
+        let result = operation(register1.wrapping_add(0), register2.wrapping_add(0));
         self.alu_zero_flag = result == 0;
 
         self.registers[dst as usize] = result; // Set destination reg to result

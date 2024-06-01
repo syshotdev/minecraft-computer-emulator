@@ -7,18 +7,20 @@ use std::fs::{self, OpenOptions};
 use std::io::{Read, BufRead, BufReader, Write};
 use std::path::Path;
 use crate::types::OpcodeEntry;
+use crate::format_err;
 
 // Expects an opcode and value, (ADD 37)
-pub fn parse_machine_file(file_path: &str) -> Vec<OpcodeEntry> {
+pub fn parse_machine_file(file_path: &str) -> Result<Vec<OpcodeEntry>, String> {
     let path = Path::new(file_path);
+    println!("Trying to open file '{}'", path.display());
 
     // Ensure the file ends with a newline
-    ensure_newline_at_end(&path);
+    ensure_newline_at_end(&path)?;
 
     // Open the file
     let file = match fs::File::open(&path) {
         Ok(file) => file,
-        Err(err) => panic!("Error opening file: {}", err),
+        Err(e) => return format_err!("Error opening file: {}", e),
     };
 
     let reader = BufReader::new(file);
@@ -30,50 +32,50 @@ pub fn parse_machine_file(file_path: &str) -> Vec<OpcodeEntry> {
                 let parts: Vec<&str> = line.split_whitespace().collect();
 
                 if parts.len() != 2 {
-                    panic!("Parsing error: line '{}' does not have exactly two parts", line);
+                    return format_err!("Parsing error: line '{}' does not have exactly two parts", line);
                 }
-
                 let opcode = parts[0].to_string();
-                let number: u32 = parts[1].parse().unwrap_or_else(|_| {
-                    panic!("Parsing error: '{}' is not a valid number", parts[1])
-                });
+                let number: u32 = match parts[1].parse() {
+                    Ok(number) => number,
+                    Err(_) => return format_err!("Parsing error: '{}' is not a valid number", parts[1]),  
+                };
 
-                // try_into tries to coerce number into right type, OR ELSE PANIC!
-                entries.push(OpcodeEntry { opcode, number: number.try_into().unwrap() });
-            }
-            Err(err) => panic!("Error reading line: {}", err),
+                // Just gave up on trying to use .try_into()
+                entries.push(OpcodeEntry { opcode, number: number as usize });
+            },
+
+            Err(e) => return format_err!("Could not read line: {}", e),
         }
     }
 
-    entries
+    Ok(entries)
 }
 
 // Does what it says, but also error handling
-fn ensure_newline_at_end(path: &Path) {
-    let metadata = match fs::metadata(path) {
-        Ok(metadata) => metadata,
-        Err(_) => return, // File does not exist or can't access metadata
-    };
+fn ensure_newline_at_end(path: &Path) -> Result<(), String> {
+    let metadata = fs::metadata(path).map_err(|e| format!("Error opening file: {e}"))?;
 
     if metadata.len() == 0 {
-        return; // Empty file, no need to add newline
-    }
-
-    let file = match fs::File::open(path) {
-        Ok(file) => file,
-        Err(err) => panic!("Error opening file: {}", err),
+        return Ok(()); // Empty file, no need to add newline
     };
+
+    // I need to stick to a standard when it comes to errors
+    // Like map_err for compounding dot syntax but format_err for match statements that need to be
+    // matched  (or the variables can't fit in one letter)
+    let file = fs::File::open(path).map_err(|e| format!("Error opening file: {e}"))?;
 
     let mut reader = BufReader::new(file);
     let mut buffer = Vec::new();
-    reader.read_to_end(&mut buffer).expect("Error reading file");
+    reader.read_to_end(&mut buffer).map_err(|e| format!("Error reading file: {e}"))?;
 
     if !buffer.ends_with(b"\n") {
         let mut file = OpenOptions::new()
             .write(true)
             .append(true)
             .open(path)
-            .expect("Error opening file for appending a newline");
-        writeln!(file).expect("Error writing newline to file");
+            .map_err(|e| format!("Error appending newline to file: {e}"))?;
+        writeln!(file).map_err(|e| format!("Error appending newline to file: {e}"))?;
     }
+
+    Ok(())
 }
