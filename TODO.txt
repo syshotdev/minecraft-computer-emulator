@@ -1,5 +1,6 @@
 What's next?:
-Find out if there's a way to not write out that cumbersome Opcodes::...
+Create a struct for instructions (1 u16 for instruction, 3 u16 for data)
+Struct for instruction is standard for whatever, so it's
 Implement all of the binary operations
 Implement the memory accesses in the way the original computer did it (or just something easier you're the boss)
 Move all of the code to a lib.rs and main.rs, maybe more modules
@@ -10,4 +11,5 @@ Create tests for opcodes and errors and whatnot
 Make the C compiler and see if it works
 
 Done:
+Find out if there's a way to not write out that cumbersome Opcodes::...
 Computer object with working opcodes
